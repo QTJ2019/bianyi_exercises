@@ -1,0 +1,5 @@
+begin
+a!8;
+a= 2*3;
+b=a+(c*d)
+end

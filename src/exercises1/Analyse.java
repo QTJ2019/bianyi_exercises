@@ -11,23 +11,32 @@ public class Analyse {
   //  private  int p_token = 0;
     private  int p_input = 0;//输入数组的下标
     private  char ch = '\0'; //当前读入字符
-    private int line = 1;  //当前行数
+    private int line = 1;  //当前行数，当ch读到\n时会加1
     private String[] rwtab = {"begin","if","then","while","do","end"};
     private Word oneWord = null;
+    private int errorNumber = 0;//记录错误的个数，包括了词法错误和语法错误
 
     public Analyse(String fileName){
+       //cifa(fileName);
+        input = read(fileName);
+        this.oneWord = new Word();
+        oneWord=scaner();
+        lrparser();
+        System.out.println("编译完成，错误次数："+errorNumber);
+    }
+
+    public void cifa(String fileName){
         input = read(fileName);
         this.oneWord = new Word();
         int over =1;
-        while (over<1000&&over!=-1){
+        while (over<1000){
             oneWord = scaner();
             //如果是注释也不输出
             if (oneWord.getTypenum()<1000 && oneWord.getTypenum()!=999){
                 System.out.println("("+oneWord.getTypenum()+","+oneWord.getWord()+")");
             }
             if (oneWord.getTypenum() == -1){
-                System.out.println("在第"+line+"行发生错误");
-                break;
+                printError("");
             }
             over = oneWord.getTypenum();
         }
@@ -204,11 +213,16 @@ public class Analyse {
         return temp;
     }
 
+    /*
+    从缓冲区读取一个字符到ch中,如果p_input大于或等于input的长度则，ch只能是input最后的那个元素
+     */
     public char m_getch(){
-        ch = input[p_input++];
+        if (p_input<input.length)
+             ch = input[p_input++];
         return  ch;
     }
 
+    //去掉空白符号
     public void getbc(){
         while (ch ==' '||ch == '\n'){
             if (ch == '\n')
@@ -246,7 +260,90 @@ public class Analyse {
         return 10;
     }
 
+    //语法分析，只能针对赋值语句
     public void lrparser(){
+        //读入的第一个词不是begin就输出错误，然后接着执行
+        if (oneWord.getTypenum() != 1)
+            printError("发生begin错误！");
+        oneWord=scaner();
+        yucu();
+        if (oneWord.getTypenum()!=6)
+            printError("发生end错误！");
+        oneWord=scaner();
+        if (oneWord.getTypenum()!=1000)
+            printError("发生结束符错误！");
+    }
+
+    public void yucu(){
+        statement();
+        while (oneWord.getTypenum()==34){
+            oneWord=scaner();
+            statement();
+        }
+    }
+
+    /**
+     * 赋值语句终结符
+     */
+    public void statement(){
+        if (oneWord.getTypenum()!=10){
+            printError("发生语句错误！");
+            //发生错误时，此行不需再分析
+           // return;
+        }
+        oneWord=scaner();
+        if (oneWord.getTypenum()!=21){
+            printError("发生赋值号错误！");
+           // return;
+        }
+        oneWord=scaner();
+        expression();
+    }
+
+    public void expression(){
+        term();
+        while (oneWord.getTypenum()==22||oneWord.getTypenum()==23){
+           oneWord=scaner();
+            term();
+        }
+    }
+
+    public void term(){
+        factor();
+        while (oneWord.getTypenum()==24||oneWord.getTypenum()==25){
+            oneWord=scaner();
+            factor();
+        }
+    }
+
+    public void factor(){
+        if (oneWord.getTypenum()==10||oneWord.getTypenum()==11)
+            oneWord=scaner();
+        else{
+            if (oneWord.getTypenum()!= 26)
+                printError("发生表达式错误！");
+            oneWord=scaner();
+            expression();
+            if (oneWord.getTypenum()!= 27)
+                printError("发生')'错误！");
+            oneWord=scaner();
+        }
 
     }
+    /**
+     * 输出错误的行数，并且把输入数组的下标定位到最近的一个换行符的位置,且令errorNumber加1
+     */
+    public void printError(String content){
+        errorNumber++;
+        System.out.println("第"+line+"行"+content);
+        //将下标定位到最近换行符
+        while (ch!='\n')
+            m_getch();
+        //要回退一次
+        retract();
+    }
+
+
+
+
 }
