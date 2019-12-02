@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Analyse {
     private char[] input = null;//存放输入的数据
@@ -15,6 +17,8 @@ public class Analyse {
     private String[] rwtab = {"begin","if","then","while","do","end"};
     private Word oneWord = null;
     private int errorNumber = 0;//记录错误的个数，包括了词法错误和语法错误
+    private int k=1;//该变量在newtemp中使用
+    private List<Quadruplet> quadlist = new ArrayList();
 
     public Analyse(String fileName){
        //cifa(fileName);
@@ -23,6 +27,8 @@ public class Analyse {
         oneWord=scaner();
         lrparser();
         System.out.println("编译完成，错误次数："+errorNumber);
+        for (Quadruplet each : quadlist)
+            System.out.println(each.getResult()+"="+each.getAg1()+each.getOp()+each.getArg2());
     }
 
     public void cifa(String fileName){
@@ -123,13 +129,16 @@ public class Analyse {
                 case '/':
                     m_getch();
                     if (ch == '/'){
+                        //如果是注释，需要跳过注释，再读一个词
                         temp.setTypenum(999);
                         temp.setWord("//");
                         while (ch!='\n')
                             m_getch();
                          retract();
+                         temp=scaner();
                          return temp;
                     }
+                    retract();
                     temp.setTypenum(25);
                     temp.setWord("/");
                     return temp;
@@ -261,74 +270,110 @@ public class Analyse {
     }
 
     //语法分析，只能针对赋值语句
-    public void lrparser(){
+    public int lrparser(){
+        int schain = 0;
         //读入的第一个词不是begin就输出错误，然后接着执行
         if (oneWord.getTypenum() != 1)
             printError("发生begin错误！");
         oneWord=scaner();
-        yucu();
+        schain = yucu();
         if (oneWord.getTypenum()!=6)
             printError("发生end错误！");
         oneWord=scaner();
         if (oneWord.getTypenum()!=1000)
             printError("发生结束符错误！");
+        return schain;
     }
 
-    public void yucu(){
-        statement();
+    public int yucu(){
+        int schain = 0;
+        schain = statement();
         while (oneWord.getTypenum()==34){
             oneWord=scaner();
-            statement();
+            schain = statement();
         }
+//        if (oneWord.getTypenum()!=34)
+//            printError("发生；错误！");
+        return schain;
     }
 
     /**
      * 赋值语句终结符
      */
-    public void statement(){
+    public int statement(){
+        int schain =0;
+        String tt = null;
+        String eplace = null;
         if (oneWord.getTypenum()!=10){
             printError("发生语句错误！");
             //发生错误时，此行不需再分析
            // return;
         }
+        tt = oneWord.getWord();
         oneWord=scaner();
         if (oneWord.getTypenum()!=21){
             printError("发生赋值号错误！");
            // return;
         }
         oneWord=scaner();
-        expression();
+        eplace = expression();
+        emit(tt,eplace,"","");
+        schain = 0;
+        return schain;
+
     }
 
-    public void expression(){
-        term();
+    public String expression(){
+        String tp = null;
+        String ep2 = null;
+        String eplace = null;
+        String tt = null;
+        eplace = term();
         while (oneWord.getTypenum()==22||oneWord.getTypenum()==23){
+            tt = oneWord.getWord();//操作符tt='+'或者'-'
            oneWord=scaner();
-            term();
+            ep2 =term();
+            tp = newtemp();
+            emit(tp,eplace,tt,ep2);//生成四元式送入四元式表
+            eplace = tp;
         }
+        return eplace;
     }
 
-    public void term(){
-        factor();
+    public String term(){
+        String tp = null;
+        String ep2 = null;
+        String eplace = null;
+        String tt = null;
+        eplace=factor();
         while (oneWord.getTypenum()==24||oneWord.getTypenum()==25){
+            tt = oneWord.getWord();
             oneWord=scaner();
-            factor();
+            ep2 = factor();
+            tp = newtemp();
+            emit(tp,eplace,tt,ep2);
+            eplace = tp;
         }
+        return eplace;
     }
 
-    public void factor(){
-        if (oneWord.getTypenum()==10||oneWord.getTypenum()==11)
+    public String factor(){
+        String fplace = null;
+        if (oneWord.getTypenum()==10||oneWord.getTypenum()==11){
+            fplace = oneWord.getWord();
             oneWord=scaner();
+        }
+
         else{
             if (oneWord.getTypenum()!= 26)
                 printError("发生表达式错误！");
             oneWord=scaner();
-            expression();
+            fplace =expression();
             if (oneWord.getTypenum()!= 27)
                 printError("发生')'错误！");
             oneWord=scaner();
         }
-
+        return fplace;
     }
     /**
      * 输出错误的行数，并且把输入数组的下标定位到最近的一个换行符的位置,且令errorNumber加1
@@ -343,7 +388,17 @@ public class Analyse {
         retract();
     }
 
+    /**
+     * 该函数会返回一个新的临时变量名，临时变量名产生的顺序为T1，T2，···
+     * @return
+     */
+    public String newtemp(){
+        return "t"+k++;
+    }
 
+    public void emit(String result, String arg1, String op, String arg2){
+        quadlist.add(new Quadruplet(result,arg1,op,arg2));
+    }
 
 
 }
