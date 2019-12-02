@@ -14,7 +14,7 @@ public class Analyse {
     private  int p_input = 0;//输入数组的下标
     private  char ch = '\0'; //当前读入字符
     private int line = 1;  //当前行数，当ch读到\n时会加1
-    private String[] rwtab = {"begin","if","then","while","do","end"};
+    private String[] rwtab = {"begin","if","then","while","do","end","endif","endwhl"};
     private Word oneWord = null;
     private int errorNumber = 0;//记录错误的个数，包括了词法错误和语法错误
     private int k=1;//该变量在newtemp中使用
@@ -27,8 +27,15 @@ public class Analyse {
         oneWord=scaner();
         lrparser();
         System.out.println("编译完成，错误次数："+errorNumber);
-        for (Quadruplet each : quadlist)
-            System.out.println(each.getResult()+"="+each.getAg1()+each.getOp()+each.getArg2());
+        int i =0;
+        for (Quadruplet each : quadlist){
+            if(each.getResult().length()>2){
+                System.out.println((i++)+" "+each.getResult()+" "+each.getAg1()+" "+each.getOp()+" "+each.getArg2());
+            }
+            else
+            System.out.println((i++) +" "+each.getResult()+"="+each.getAg1()+each.getOp()+each.getArg2());
+        }
+
     }
 
     public void cifa(String fileName){
@@ -262,11 +269,11 @@ public class Analyse {
     }
 
     public int reserve(){
-        for (int i=0;i<6; i++){
+        for (int i=0;i<8; i++){
             if (rwtab[i].equals(token))
                 return i+1;//关键字表格中有匹配的，就返回该关键字种别码
         }
-        return 10;
+        return 10;//没有匹配到就返回10
     }
 
     //语法分析，只能针对赋值语句
@@ -304,11 +311,10 @@ public class Analyse {
         int schain =0;
         String tt = null;
         String eplace = null;
-        if (oneWord.getTypenum()!=10){
-            printError("发生语句错误！");
+        if (oneWord.getTypenum()==10){
+            //printError("发生语句错误！");
             //发生错误时，此行不需再分析
            // return;
-        }
         tt = oneWord.getWord();
         oneWord=scaner();
         if (oneWord.getTypenum()!=21){
@@ -319,10 +325,23 @@ public class Analyse {
         eplace = expression();
         emit(tt,eplace,"","");
         schain = 0;
+    }else if (oneWord.getWord().equals("if")){
+            oneWord = scaner();
+            schain =ifyuju();
+        }else if (oneWord.getWord().equals("while")){
+            oneWord = scaner();
+            schain = whlyuju();
+        }
+        //这里是不是应该设一个报错
         return schain;
 
     }
 
+    /**
+     * 表达式语句，<表达式>::=<项>｛+<项>|-<项>｝
+     * flag 标识该表达式是否在赋值语句，true表示在，false表示不在
+     * @return 返回表达式的结果
+     */
     public String expression(){
         String tp = null;
         String ep2 = null;
@@ -374,6 +393,73 @@ public class Analyse {
             oneWord=scaner();
         }
         return fplace;
+    }
+
+    /**
+     * if语句，
+     * @return
+     */
+    public int ifyuju(){
+        int schain = 0;
+        Quadruplet temp = null;
+            temp =conditon();
+            //不等于then,报错
+            if (oneWord.getTypenum()!=3){
+                printError("发生缺少then错误！");
+                //最好跳过整个if语句
+            }
+            oneWord = scaner();
+            yucu();
+            temp.setResult(temp.getResult()+quadlist.size());//then后面要有语句，否则会跳转出错
+            if (!oneWord.getWord().equals("endif")){
+                printError("缺少endif！");
+            }
+            oneWord = scaner();
+        return  schain;
+    }
+
+    public int whlyuju(){
+        int schain =0;
+        Quadruplet temp = null;
+        temp = conditon();
+        if (oneWord.getTypenum()!=3){
+            printError("发生缺少then错误！");
+        }
+        oneWord = scaner();
+        yucu();
+        temp.setResult(temp.getResult()+quadlist.size());
+        if (!oneWord.getWord().equals("endwhl")){
+            printError("缺少endwhl！");
+        }
+        oneWord = scaner();
+        return  schain;
+    }
+
+    public Quadruplet conditon(){
+        int schain = 0;
+        String eplace1 = null;//存放expression（）的返回值
+        String eplace2 = null;
+        String tempWord = null;
+        eplace1 = expression();
+        Quadruplet temp = null;//返回四元组对象
+        switch (oneWord.getWord()){
+            case"<":break;
+            case"<=":break;
+            case">":break;
+            case">=":break;
+            case"==":break;
+            case "!=":break;
+            default:printError("出现条件语句错误！");
+            //还需要跳过整个赋值语句
+            return null;
+        }
+        tempWord = oneWord.getWord();
+        oneWord = scaner();
+        eplace2 = expression();
+        emit("true"+(quadlist.size()+2),eplace1,tempWord,eplace2);//生成条件语句,如果then后面为空，会导致跳转异常
+        temp = new Quadruplet("false",eplace1,tempWord,eplace2);//该对象的跳转行数需要在ifyuju（）中添加
+        quadlist.add(temp);//
+        return temp;
     }
     /**
      * 输出错误的行数，并且把输入数组的下标定位到最近的一个换行符的位置,且令errorNumber加1

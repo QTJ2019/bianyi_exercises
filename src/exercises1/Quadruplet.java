@@ -1,7 +1,7 @@
 package exercises1;
 
 public class Quadruplet {
-    private String result = null;
+    private String result = null;//result的大小用做区别赋值语句、条件语句的标志。用作条件语句的例子true 10（其中true表示条件语句的结果，10表示需要调到的行数）
     private String ag1 = null;
     private String op = null;
     private String arg2 = null;
